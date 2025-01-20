@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, BinaryIO
+from typing import IO, Any, Optional, Tuple, BinaryIO
 import struct
 
 
@@ -26,17 +26,19 @@ class DataFile:
         Raises
         ------
         ValueError
-            If `filePath` is empty or `appendMode` is not a boolean.
+            If filePath is empty.
+        TypeError
+            If appendMode is not a boolean.
         """
         if not filePath:
-            raise ValueError("filePath cannot be empty.")
+            raise ValueError("filePath Cannot Be Empty.")
         if not isinstance(appendMode, bool):
-            raise ValueError("appendMode must be a boolean.")
+            raise TypeError("appendMode Must Be A Boolean.")
 
         self._filePath = filePath
         self.appendMode = appendMode
 
-        self._fileHandle: Optional[BinaryIO] = None
+        self._fileHandle: Optional[IO[Any]] = None
         self._lastReadOffset: int = 0
         self._fileSize: int = 0
 
@@ -56,7 +58,7 @@ class DataFile:
             self._fileSize = self._fileHandle.seek(0, 2)
 
         except OSError as e:
-            raise IOError(f"Failed To Open File: {e}")
+            raise IOError(f"Failed To Open File {self._filePath}: {e}")
 
     def appendRecord(self, key: bytes, value: bytes, timestamp: int) -> Tuple[int, int]:
         """
@@ -81,10 +83,12 @@ class DataFile:
         RuntimeError
             If the file is not open for appending.
         ValueError
-            If `timestamp` is negative or `key`/`value` are empty.
+            If key is empty or not a bytes object, or timestamp is negative.
         """
         if self._fileHandle is None or self._fileHandle.closed:
             raise RuntimeError("File Is Not Open For Appending.")
+        if not key or not isinstance(key, bytes):
+            raise ValueError("Key Must Be A Non-Empty Bytes Object.")
         if timestamp < 0:
             raise ValueError("Timestamp Must Be Non-Negative.")
 
@@ -127,7 +131,7 @@ class DataFile:
         RuntimeError
             If the file is not open for reading.
         ValueError
-            If `offset` or `length` is negative.
+            If offset or length is negative.
         IndexError
             If the record exceeds the file size or is incomplete.
         """

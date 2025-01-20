@@ -67,7 +67,7 @@ def test_append_empty_key_value(tempFile):
     df = DataFile(tempFile, appendMode=True)
     df.open()
 
-    offset, length = df.appendRecord(key=b"", value=b"", timestamp=123)
+    offset, length = df.appendRecord(key=b"a", value=b"", timestamp=123)
     assert offset >= 0
     assert length > 0
 

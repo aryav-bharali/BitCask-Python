@@ -2,7 +2,7 @@ import pytest
 import os
 from tempfile import TemporaryDirectory
 from pathlib import Path
-from src import DataFile
+from src.datafile import DataFile
 
 
 @pytest.fixture
@@ -16,7 +16,11 @@ def tempFile():
 @pytest.fixture
 def sampleData():
     """Provides sample key, value, and timestamp."""
-    return {"key": b"Sample Key", "value": b"Sample Value", "timestamp": 1122334455}
+    return {
+        "key": b"Sample Key",
+        "value": b"Sample Value",
+        "timestamp": 1122334455,
+    }
 
 
 def test_invalid_file_path():
@@ -183,7 +187,11 @@ def test_large_records(tempFile):
     large_value = b"b" * (2**20)  # 1 mb value
     df = DataFile(tempFile, appendMode=True)
     df.open()
-    offset, length = df.appendRecord(key=large_key, value=large_value, timestamp=123)
+    offset, length = df.appendRecord(
+        key=large_key,
+        value=large_value,
+        timestamp=123,
+    )
     df.close()
 
     df = DataFile(tempFile, appendMode=False)

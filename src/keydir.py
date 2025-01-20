@@ -1,7 +1,6 @@
 from typing import Dict, Optional
 from collections import namedtuple
 
-
 KeyDirEntry = namedtuple(
     "KeyDirEntry", ["fileID", "valueSize", "valuePos", "timestamp"]
 )
@@ -19,7 +18,12 @@ class KeyDir:
         self._index: Dict[bytes, KeyDirEntry] = {}
 
     def addEntry(
-        self, key: bytes, fileID: int, valueSize: int, valuePos: int, timestamp: int
+        self,
+        key: bytes,
+        fileID: int,
+        valueSize: int,
+        valuePos: int,
+        timestamp: int,
     ) -> None:
         """
         Adds or updates an entry in the key directory.
@@ -44,13 +48,15 @@ class KeyDir:
 
         Notes
         -----
-        If the key already exists, its entry will be updated with the new metadata.
+        If the key already exists, entry will be updated with the new metadata.
         """
         if not key or not isinstance(key, bytes):
             raise ValueError("Key Must Be A Non-Empty Bytes Object.")
         if fileID < 0 or valueSize < 0 or valuePos < 0:
-            raise ValueError("FileID, ValueSize, And ValuePos Must Be Non-Negative.")
-        
+            raise ValueError(
+                "FileID, ValueSize, And ValuePos Must Be Non-Negative.",
+            )
+
         self._index[key] = KeyDirEntry(fileID, valueSize, valuePos, timestamp)
 
     def getEntry(self, key: bytes) -> Optional[KeyDirEntry]:
@@ -93,6 +99,6 @@ class KeyDir:
         """
         if not key or not isinstance(key, bytes):
             raise ValueError("Key Must Be A Non-Empty Bytes Object.")
-        
+
         if key in self._index:
             del self._index[key]

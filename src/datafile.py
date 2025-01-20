@@ -1,10 +1,11 @@
-from typing import IO, Any, Optional, Tuple, BinaryIO
+from typing import IO, Any, Optional, Tuple
 import struct
 
 
 class DataFile:
     """
-    Represents an immutable data file for storing key-value pairs in an append-only manner.
+    Represents an immutable data file for storing key-value
+    pairs in an append-only manner.
 
     Attributes
     ----------
@@ -60,7 +61,12 @@ class DataFile:
         except OSError as e:
             raise IOError(f"Failed To Open File {self._filePath}: {e}")
 
-    def appendRecord(self, key: bytes, value: bytes, timestamp: int) -> Tuple[int, int]:
+    def appendRecord(
+        self,
+        key: bytes,
+        value: bytes,
+        timestamp: int,
+    ) -> Tuple[int, int]:
         """
         Appends a key-value pair to the data file.
 
@@ -151,7 +157,10 @@ class DataFile:
         if len(recordData) < headerSize:
             raise IndexError("Record Data Doesn't Include Header.")
 
-        _, keySize, valueSize = struct.unpack(headerFormat, recordData[:headerSize])
+        _, keySize, valueSize = struct.unpack(
+            headerFormat,
+            recordData[:headerSize],
+        )
 
         keyStart = headerSize
         keyEnd = keyStart + keySize
@@ -159,7 +168,7 @@ class DataFile:
         valueEnd = valueStart + valueSize
 
         if valueEnd > len(recordData):
-            raise IndexError("Record Data Doesn't Include Full Key-Value Pair.")
+            raise IndexError("Record Data Doesn't Include Full KV Pair.")
 
         key = recordData[keyStart:keyEnd]
         value = recordData[valueStart:valueEnd]

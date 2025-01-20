@@ -1,5 +1,5 @@
 import pytest
-from src import KeyDir, KeyDirEntry
+from src.keydir import KeyDir, KeyDirEntry
 
 TEST_ENTRY = KeyDirEntry(1, 100, 10, 123456)
 
@@ -129,7 +129,7 @@ def test_multiple_keys(keyDir):
 
 
 def test_multiple_operations_on_same_key(keyDir):
-    """Test multiple operations (add, update, remove, add, update) on the same key."""
+    """Test multiple operations on the same key."""
     key = b"MultiOp Key"
     firstEntry = KeyDirEntry(1, 100, 10, 123456)
     updatedEntry = KeyDirEntry(2, 200, 20, 123457)

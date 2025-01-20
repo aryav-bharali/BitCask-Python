@@ -8,16 +8,8 @@ class DataFile:
 
     Attributes
     ----------
-    filePath : str
-        Path to the data file on disk.
     appendMode : bool
         Whether the file is opened for appending (True) or reading (False).
-    fileHandle : Optional[object]
-        File handle for low-level I/O operations.
-    lastReadOffset : int
-        The last read position in the file, used for optimizing sequential reads.
-    fileSize : int
-        The size of the file in bytes.
     """
 
     def __init__(self, filePath: str, appendMode: bool):
@@ -30,12 +22,23 @@ class DataFile:
             Path to the data file.
         appendMode : bool
             True for appending, False for reading.
+
+        Raises
+        ------
+        ValueError
+            If `filePath` is empty or `appendMode` is not a boolean.
         """
-        self.filePath = filePath
+        if not filePath:
+            raise ValueError("filePath cannot be empty.")
+        if not isinstance(appendMode, bool):
+            raise ValueError("appendMode must be a boolean.")
+
+        self._filePath = filePath
         self.appendMode = appendMode
-        self.fileHandle: Optional[BinaryIO] = None
-        self.lastReadOffset: int = 0
-        self.fileSize: int = 0
+
+        self._fileHandle: Optional[BinaryIO] = None
+        self._lastReadOffset: int = 0
+        self._fileSize: int = 0
 
     def open(self) -> None:
         """
@@ -43,19 +46,17 @@ class DataFile:
 
         Raises
         ------
-        Exception
+        IOError
             If the file cannot be opened.
         """
         mode = "ab" if self.appendMode else "rb"
 
         try:
-            self.fileHandle = open(self.filePath, mode)
-
-            self.fileHandle.seek(0, 2)
-            self.fileSize = self.fileHandle.tell()
+            self._fileHandle = open(self._filePath, mode)
+            self._fileSize = self._fileHandle.seek(0, 2)
 
         except OSError as e:
-            raise Exception(f"Failed To Open File: {e}")
+            raise IOError(f"Failed To Open File: {e}")
 
     def appendRecord(self, key: bytes, value: bytes, timestamp: int) -> Tuple[int, int]:
         """
@@ -74,33 +75,34 @@ class DataFile:
         -------
         Tuple[int, int]
             The byte offset and length of the written record.
-        """
-        if self.fileHandle is None or self.fileHandle.closed:
-            raise Exception("File Is Not Open For Appending")
-        elif timestamp < 0:
-            raise Exception("Timestamp Must Be Non-Negative")
 
-        # Serialize The Record
-        key_size = len(key)
-        value_size = len(value)
-        record_format = f"!I Q I I {key_size}s {value_size}s"
+        Raises
+        ------
+        RuntimeError
+            If the file is not open for appending.
+        ValueError
+            If `timestamp` is negative or `key`/`value` are empty.
+        """
+        if self._fileHandle is None or self._fileHandle.closed:
+            raise RuntimeError("File Is Not Open For Appending.")
+        if timestamp < 0:
+            raise ValueError("Timestamp Must Be Non-Negative.")
+
+        keySize, valueSize = len(key), len(value)
+        recordFormat = f"!Q I I {keySize}s {valueSize}s"
         record = struct.pack(
-            record_format,
-            key_size + value_size + 16,
+            recordFormat,
             timestamp,
-            key_size,
-            value_size,
+            keySize,
+            valueSize,
             key,
             value,
         )
 
-        # Write The Record
-        offset = self.fileHandle.tell()
-        self.fileHandle.write(record)
-        self.fileHandle.flush()
-
-        # Update fileSize directly using tell()
-        self.fileSize = self.fileHandle.tell()
+        offset = self._fileHandle.tell()
+        self._fileHandle.write(record)
+        self._fileHandle.flush()
+        self._fileSize = self._fileHandle.tell()
 
         return offset, len(record)
 
@@ -119,47 +121,62 @@ class DataFile:
         -------
         Tuple[bytes, bytes]
             The key and value stored in the record.
+
+        Raises
+        ------
+        RuntimeError
+            If the file is not open for reading.
+        ValueError
+            If `offset` or `length` is negative.
+        IndexError
+            If the record exceeds the file size or is incomplete.
         """
-        if self.fileHandle is None or self.fileHandle.closed:
-            raise Exception("File Is Not Open For Reading")
-        elif offset < 0 or length < 0:
-            raise Exception("Offset And Length Must Be Non-Negative")
+        if self._fileHandle is None or self._fileHandle.closed:
+            raise RuntimeError("File Is Not Open For Reading.")
+        if offset < 0 or length < 0:
+            raise ValueError("Offset And Length Must Be Non-Negative.")
+        if offset > self._fileSize or length > self._fileSize - offset:
+            raise IndexError("Record Exceeds File Size.")
 
-        # Efficient bounds checking
-        if offset > self.fileSize or length > self.fileSize - offset:
-            raise Exception("Record Exceeds File Size")
+        self._fileHandle.seek(offset)
+        recordData = self._fileHandle.read(length)
 
-        # Absolute Seek to the offset
-        self.fileHandle.seek(offset)
+        headerFormat = "!Q I I"
+        headerSize = struct.calcsize(headerFormat)
 
-        # Read & Parse The Record
-        record_data = self.fileHandle.read(length)
+        if len(recordData) < headerSize:
+            raise IndexError("Record Data Doesn't Include Header.")
 
-        # Extract Header & Key-Value Data
-        header_format = "!I Q I I"
-        header_size = struct.calcsize(header_format)
+        _, keySize, valueSize = struct.unpack(headerFormat, recordData[:headerSize])
 
-        if len(record_data) < header_size:
-            raise Exception("Incomplete Record Data")
+        keyStart = headerSize
+        keyEnd = keyStart + keySize
+        valueStart = keyEnd
+        valueEnd = valueStart + valueSize
 
-        _, _, key_size, value_size = struct.unpack(
-            header_format, record_data[:header_size]
-        )
+        if valueEnd > len(recordData):
+            raise IndexError("Record Data Doesn't Include Full Key-Value Pair.")
 
-        key_start = header_size
-        key_end = key_start + key_size
-        value_start = key_end
-        value_end = value_start + value_size
-
-        key = record_data[key_start:key_end]
-        value = record_data[value_start:value_end]
+        key = recordData[keyStart:keyEnd]
+        value = recordData[valueStart:valueEnd]
 
         return key, value
+
+    def size(self) -> int:
+        """
+        Returns the size of the data file in bytes.
+
+        Returns
+        -------
+        int
+            The size of the data file in bytes.
+        """
+        return self._fileSize
 
     def close(self) -> None:
         """
         Closes the data file.
         """
-        if self.fileHandle:
-            self.fileHandle.close()
-            self.fileHandle = None
+        if self._fileHandle:
+            self._fileHandle.close()
+            self._fileHandle = None
